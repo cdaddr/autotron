@@ -57,7 +57,7 @@
      xs
      (cons x (remove-first pred xs)))))
 
-(defn update-mana [{:keys [battlefield] :as state}]
+(defn untap-lands [{:keys [battlefield] :as state}]
   (let [blue (count (filter bluemana? battlefield))
         colorless (count (filter otherland? battlefield))]
     (update-in state [:mana] assoc :blue blue :colorless colorless)))
@@ -67,7 +67,7 @@
     :battlefield (conj battlefield spell)
     :hand (remove-first #{spell} hand)))
 
-(defn to-gy [{:keys [battlefield graveyard] :as state} card]
+(defn bf-to-gy [{:keys [battlefield graveyard] :as state} card]
   (assoc state
     :graveyard (conj graveyard card)
     :battlefield (remove-first #{card} battlefield)))
@@ -120,15 +120,16 @@
   (-> state
       shuffle-deck
       (draw 7)
-      update-mana))
+      untap-lands))
 
+;; FIXME: implement scrying (keeping lands on top?)
 (defn scry [state]
   state)
 
-(defn step [state]
+(defn new-turn [state]
   (-> state
       (draw 1)
-      update-mana
+      untap-lands
       (assoc :played-land? false)
       (update-in [:turn] inc)))
 
@@ -155,6 +156,7 @@
         unplayed (cset/difference urzaland? played)]
     unplayed))
 
+;; FIXME: Make sure I'm searching for a land I don't already have in hand (drew this turn)
 (defn use-map [state]
   (let [unplayed (unplayed-urzalands state)]
     (if (and (on-battlefield? state :expedition-map)
@@ -164,7 +166,7 @@
         (log "  Using map to find" card)
         (-> state
             (pay {:colorless 2})
-            (to-gy :expedition-map)
+            (bf-to-gy :expedition-map)
             (tutor card)))
       state)))
 
@@ -205,6 +207,7 @@
 (defn cast-remand [state]
   (try-to-cast state :remand {:blue 1 :colorless 1}
                #(draw % 1)))
+;; FIXME: implement scrying (keeping lands on top?)
 (defn cast-condescend [state]
   (try-to-cast state :condescend {:blue 1 :colorless 1}))
 (defn cast-thirst-for-knowledge [state]
@@ -235,7 +238,7 @@
 
 (defn simulate-game []
   (loop [state (init-game (make-state))]
-    (let [new-state (step state)]
+    (let [new-state (new-turn state)]
       (log "Turn" (:turn new-state) "| HAND" (:hand new-state) "| MANA" (:mana new-state) "| BF" (:battlefield new-state))
       (let [new-state (try-strategy new-state)]
         (if (tron? new-state)
