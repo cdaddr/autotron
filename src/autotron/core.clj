@@ -226,9 +226,6 @@
    cast-condescend
    cast-thirst-for-knowledge])
 
-(def STRATEGY
-  [play-new-urza-land])
-
 (defn try-strategy [state]
   (loop [state state]
     (let [new-state (reduce #(%2 %1) state STRATEGY)]
