@@ -24,6 +24,7 @@
                          :nonblue-land 2
                          :expedition-map 4
                          :thirst-for-knowledge 4
+                         :solemn 2
                          :remand 4
                          :condescend 4
                          :talisman 3}))
@@ -83,10 +84,13 @@
     :deck (shuffle (remove-first #{card} deck))
     :hand (conj hand card)))
 
+(defn deck-to-bf [{:as state} card]
+  (-> state (tutor card) (hand-to-bf card)))
+
 (defn pay [state cost]
   (let [state (-> state
-                  (update-in [:mana :blue] - (:blue cost 0))
-                  (update-in [:mana :colorless] - (:colorless cost 0))) ]
+                  (update-in [:mana :blue] (fnil - 0) (:blue cost 0))
+                  (update-in [:mana :colorless] (fnil - 0) (:colorless cost 0))) ]
     (if (neg? (-> state :mana :colorless))
       (-> state
           (update-in [:mana :blue] + (-> state :mana :colorless))
@@ -203,11 +207,17 @@
       state)))
 
 (defn play-talisman [state]
-  (try-to-play state :talisman {:colorless 2} #(update-in % [:mana :blue] (fnil inc 1))))
+  (try-to-play state :talisman {:colorless 2}
+               #(update-in % [:mana :blue] (fnil inc 1))))
+
+(defn play-solemn [state]
+  (try-to-play state :solemn {:colorless 4}
+               #(deck-to-bf % :island)))
 
 (defn cast-remand [state]
   (try-to-cast state :remand {:blue 1 :colorless 1}
                #(draw % 1)))
+
 ;; FIXME: implement scrying (keeping lands on top?)
 (defn cast-condescend [state]
   (try-to-cast state :condescend {:blue 1 :colorless 1}))
@@ -222,6 +232,7 @@
    play-other-land
    use-map
    play-talisman
+   play-solemn
    play-map
    cast-remand
    cast-condescend
@@ -234,7 +245,7 @@
         state
         (recur new-state)))))
 
-(defn simulate-game []
+(defn simulate-until-tron []
   (loop [state (init-game (make-state))]
     (let [new-state (new-turn state)]
       (log "Turn" (:turn new-state) "| HAND" (:hand new-state) "| MANA" (:mana new-state) "| BF" (:battlefield new-state))
@@ -245,12 +256,13 @@
             new-state)
           (recur new-state))))))
 
-(defn simulate-game-2 []
+(defn simulate-until-7-mana []
   (loop [state (init-game (make-state))]
     (let [new-state (new-turn state)]
       (log "Turn" (:turn new-state) "| HAND" (:hand new-state) "| MANA" (:mana new-state) "| BF" (:battlefield new-state))
       (let [new-state (try-strategy new-state)]
-        (if (can-afford? new-state {:colorless 6})
+        (if (or (tron? new-state)
+                (can-afford? new-state {:colorless 7}))
           new-state
           (recur new-state))))))
 
@@ -263,8 +275,8 @@
           {}
           (range 1 (inc n))))
 
-(defn turn-report [data]
-  (with-open [fh (io/writer "turns.csv")]
+(defn turn-report [data filename]
+  (with-open [fh (io/writer filename)]
     (let [xs (:turn data)
           n (apply max (map first xs))]
       (prn xs n)
