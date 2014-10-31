@@ -30,9 +30,9 @@
 
 (def blueland? #{:island})
 (def bluemana? #{:island :talisman})
-(def otherland? #{:urza-mine :urza-powerplant :urza-tower :nonblue-land})
+(def nonblueland? #{:urza-mine :urza-powerplant :urza-tower :nonblue-land})
 (def urzaland? #{:urza-mine :urza-powerplant :urza-tower})
-(defn land? [x] (or (blueland? x) (otherland? x)))
+(defn land? [x] (or (blueland? x) (nonblueland? x)))
 
 (defn in-hand? [state card]
   (some #{card} (:hand state)))
@@ -59,7 +59,7 @@
 
 (defn untap-lands [{:keys [battlefield] :as state}]
   (let [blue (count (filter bluemana? battlefield))
-        colorless (count (filter otherland? battlefield))]
+        colorless (count (filter nonblueland? battlefield))]
     (update-in state [:mana] assoc :blue blue :colorless colorless)))
 
 (defn hand-to-bf [{:keys [hand battlefield] :as state} spell]
@@ -195,7 +195,7 @@
       state)))
 
 (defn play-other-land [state]
-  (let [land (first (filter otherland? (:hand state)))]
+  (let [land (first (filter nonblueland? (:hand state)))]
     (if (and (not (:played-land? state))
              land)
       (play-land state land)
