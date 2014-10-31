@@ -58,7 +58,8 @@
      (cons x (remove-first pred xs)))))
 
 (defn untap-lands [{:keys [battlefield] :as state}]
-  (let [blue (count (filter bluemana? battlefield))
+  (let [blue (+ (count (filter bluemana? battlefield))
+                (count (filter #{:talisman} battlefield)))
         colorless (count (filter nonblueland? battlefield))]
     (update-in state [:mana] assoc :blue blue :colorless colorless)))
 
@@ -202,7 +203,7 @@
       state)))
 
 (defn play-talisman [state]
-  (try-to-cast state :talisman {:colorless 2} #(update-in % [:mana :blue] (fnil inc 1))))
+  (try-to-play state :talisman {:colorless 2} #(update-in % [:mana :blue] (fnil inc 1))))
 
 (defn cast-remand [state]
   (try-to-cast state :remand {:blue 1 :colorless 1}
@@ -244,11 +245,20 @@
             new-state)
           (recur new-state))))))
 
-(defn simulate-n [n]
+(defn simulate-game-2 []
+  (loop [state (init-game (make-state))]
+    (let [new-state (new-turn state)]
+      (log "Turn" (:turn new-state) "| HAND" (:hand new-state) "| MANA" (:mana new-state) "| BF" (:battlefield new-state))
+      (let [new-state (try-strategy new-state)]
+        (if (can-afford? new-state {:colorless 6})
+          new-state
+          (recur new-state))))))
+
+(defn simulate-n [n simulator]
   (reduce (fn [acc i]
             (when (zero? (mod i (/ n 10)))
               (println "iter" i))
-            (let [state (simulate-game)]
+            (let [state (simulator)]
               (update-in acc [:turn (:turn state)] (fnil inc 0))))
           {}
           (range 1 (inc n))))
